@@ -2,7 +2,7 @@
 tags: [LoRA, MTX, Stable Diffusion]
 title: LoRA of Stable Diffusion
 created: '2023-07-07T08:34:23.283Z'
-modified: '2023-07-08T07:25:34.395Z'
+modified: '2023-07-08T14:21:17.513Z'
 ---
 
 # LoRA of Stable Diffusion
@@ -47,7 +47,39 @@ prompt_part_1, prompt_part_2, (...), prompt_end, <lora:a_lora_model:0.7>
 
 ## 补充学习
 
-不太行得再看看（
+不太行得恶补一波前置知识（
+
+[LoRA原理与实践](https://zhuanlan.zhihu.com/p/627133491) 看起来不错。
+
+### UNet
+
+UNet 的网络结构形似字母“U”因此得名，左半边为**特征提取部分**，右半边为**上采样部分**（上采样就是放大图片），其实也就是熟悉的 **Encoder-Decoder** 结构。
+
+### 关于 Attention
+
+通俗地说，$Q$ 和 $K$ 的作用是用来在 token 之间搬运信息，而 $V$ 本身就是从当前 token 中提取出的信息，$Q$ 和 $K$ 计算出当前 token 和其他 token 的相似度，这个相似度作为权值对 $V$ 进行加权求和，可以作为下一层的 token。在 Stable Diffusion 中（如上文中的图），$y$ 是指导图像生成的条件， $z_t$ 是噪声，经过 cross attention 后即可融合两部分的特征，可以看作是 $y$ 指导反向过程中 $z_t$ 如何一步步去噪变成 $z$。
+
+### 关于 LoRA
+
+LoRA 具体修改的是 UNet 中的 cross attention 层，也就是文本与图像交界的层，微调该部分足以实现良好的性能。Cross attention 层的权重是一个矩阵，LoRA fine tune 这些权重矩阵分解为两个矩阵存储，将两个矩阵相乘即可得到原权重矩阵，于是大大减少了参数量并且不会对性能产生什么负面影响。
+
+哦哦哦，所以意思就是假如对 cross-attention 层的全部参数进行微调会很耗时间，而把它拆开**（低秩分解）**之后可以把原来 $d \times d$ 维度的矩阵分解为两个 $r \times d$ 的矩阵，此处 $r < d$
+
+### 关于上文提到的 fine tune 与 Dreambooth
+
+Dreambooth其实是一种微调方法，它使用了 LoRA 技术。假如用以前的方法对 cross-attention 进行微调，整个模型都会被这些新的训练数据污染。比如那哈士奇去训练 `dog` 这个标签，可能所有 `dog` 都会变成哈士奇了（或者有一些相似性），简单来说就是**学了新的忘了旧的**。于是 Dreambooth 这篇论文就提出了一个方法，提出一种损失叫 **Prior-preservation Loss**，通过鼓励扩散模型不断生成与主题相同的类的不同实例，以便在 few-shot（小样本）微调开始后保留先验知识，从而减轻模型过拟合、语言漂移等问题。
+
+这种 Dreambooth 方法，可以得到这样的东西：
+
+输入训练集 + 提示词 `[v]dog`，然后还有本来模型自己生成的一堆 `dog` 图像，训练完之后就会得到一个 `[v]` 标识，通过这个标识就可以把原来模型生成的 `dog` 与新训练的 `dog` 分开了。太智慧了。太智慧了。太智慧了。
+
+![fine-tuning](https://pic2.zhimg.com/80/v2-cba4fd460f81241790dad3e5311c3ec9_1440w.webp)
+
+## 最后 数学
+
+啥是**低秩分解**捏？
+
+唉看不懂，得找点线性代数教学看。3Blue1Brown 我的神啊。
 
 
 
